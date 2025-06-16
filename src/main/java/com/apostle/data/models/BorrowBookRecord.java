@@ -22,4 +22,9 @@ public class BorrowBookRecord {
     @NotNull
     private LocalDateTime dueDate;
     private BorrowStatus status;
+    private LocalDateTime returnDate;
+
+//    private LocalDateTime dueSoonDate;
+    private boolean isOverdue;
+    private double fineAmount;
 }

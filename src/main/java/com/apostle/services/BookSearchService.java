@@ -17,8 +17,12 @@ public class BookSearchService {
     }
 
     public List<Book> searchBooks(String query) {
-        if (query == null || query.isBlank()) return List.of();
-        return bookRepository.findByTitleContainingIgnoreCaseOrAuthorContainingIgnoreCaseOrIsbnContainingIgnoreCase(
-                query, query, query);
+        List<Book> books = bookRepository.findByTitleContainingIgnoreCaseOrAuthorContainingIgnoreCaseOrIsbnContainingIgnoreCase(query, query, query);
+        books.forEach(book -> {
+            if (book.getImageUrl() == null && book.getIsbn() != null) {
+                book.setImageUrl("https://covers.openlibrary.org/b/isbn/" + book.getIsbn() + "-M.jpg");
+            }
+        });
+        return books;
     }
 }

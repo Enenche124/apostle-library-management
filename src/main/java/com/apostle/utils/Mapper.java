@@ -1,8 +1,10 @@
 package com.apostle.utils;
 
 import com.apostle.data.models.Admin;
+import com.apostle.data.models.BorrowBookRecord;
 import com.apostle.data.models.User;
 import com.apostle.dtos.requests.RegisterRequest;
+import com.apostle.dtos.responses.BorrowResponse;
 import com.apostle.dtos.responses.LoginResponse;
 import com.apostle.dtos.responses.RegisterResponse;
 
@@ -12,7 +14,7 @@ public class Mapper {
         User user = new User();
         user.setUsername(registerRequest.getUsername());
         user.setPassword(registerRequest.getPassword());
-        user.setEmail(registerRequest.getEmail());
+        user.setEmail(registerRequest.getEmail().toLowerCase().trim());
         return user;
     }
 
@@ -30,4 +32,33 @@ public class Mapper {
     public static LoginResponse mapToLoginResponse(String username, boolean success, String role, String token){
         return new LoginResponse(username,success,role,token);
     }
+
+    public static BorrowResponse mapToBorrowResponse(BorrowBookRecord borrowRecord, String message, boolean success) {
+        return new BorrowResponse(
+                message,
+                success,
+                borrowRecord.getId(),
+                borrowRecord.getBookIsbn(),
+                borrowRecord.getBorrower(),
+                borrowRecord.getBorrowDate(),
+                borrowRecord.getDueDate(),
+                borrowRecord.getStatus(),
+                borrowRecord.getFineAmount()
+        );
+    }
+
+    public static BorrowResponse mapToErrorResponse(String message){
+        return new BorrowResponse(
+                message,
+                false,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
+    }
+
 }

@@ -7,6 +7,9 @@ import lombok.Data;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import java.time.LocalDateTime;
+import java.util.List;
+
 @Document(collection = "fines")
 @Data
 public class Fine {
@@ -19,5 +22,12 @@ public class Fine {
     @NotNull
     private double fineAmount;
     private FineStatus status;
+
+    private String borrowId; // Reference to the borrow record
+    private LocalDateTime createdDate;
+    private LocalDateTime lastUpdatedDate;
+    private List<Payment> payments; // Track payment history
+    private double remainingAmount;
+
 
 }

@@ -3,7 +3,6 @@ package com.apostle.services;
 import com.apostle.data.models.Book;
 import com.apostle.data.repositories.BookRepository;
 import com.apostle.exceptions.BookNotFoundException;
-import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -24,7 +23,7 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    public Book addBook(@Valid Book book) {
+    public Book addBook( Book book) {
         if (bookRepository.existsByIsbn(book.getIsbn())) {
             throw new IllegalArgumentException("ISBN already exists");
         }

@@ -13,8 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest(classes = {Main.class })
 public class AuthenticationServiceImplTest {
@@ -124,6 +123,28 @@ public class AuthenticationServiceImplTest {
         LoginResponse loginResponse = authenticationService.login(loginRequest);
         assertTrue(loginResponse.isSuccess());
         assertFalse(loginResponse.getToken().isEmpty());
+        assertEquals("USER", loginResponse.getRole());
+        assertEquals("John", loginResponse.getUsername());
+    }
+
+    @Test
+    public void loginAdmin_test(){
+        RegisterRequest registerRequest = new RegisterRequest();
+        registerRequest.setUsername("John");
+        registerRequest.setEmail("mike@gmail.com");
+        registerRequest.setPassword("Mike@2002");
+        registerRequest.setRole(Role.ADMIN);
+        RegisterResponse registerResponse = authenticationService.register(registerRequest);
+        assertTrue(registerResponse.isSuccess());
+
+        LoginRequest loginRequest = new LoginRequest();
+        loginRequest.setEmail("mike@gmail.com");
+        loginRequest.setPassword("Mike@2002");
+        LoginResponse loginResponse = authenticationService.login(loginRequest);
+        assertTrue(loginResponse.isSuccess());
+        assertFalse(loginResponse.getToken().isEmpty());
+        assertEquals("ADMIN", loginResponse.getRole());
+        assertEquals("John", loginResponse.getUsername());
 
     }
 
