@@ -40,13 +40,14 @@ public class LibraryNotificationService {
     @Transactional(readOnly = true)
     public void checkAndNotifyDueDates() {
         LocalDate today = LocalDate.now();
-        List<BorrowBookRecord> dueSoonBooks = borrowRepository.findByDueDateBefore(today.plusDays(2).atStartOfDay());
+        List<BorrowBookRecord> dueSoonBooks = borrowRepository.findByDueDate(today.plusDays(2).atStartOfDay());
 
         for (BorrowBookRecord record : dueSoonBooks) {
             emailService.sendBookDueReminder(
                     record.getBorrower(),
                     record.getBookIsbn(),
                     LocalDate.from(record.getDueDate())
+
             );
         }
     }
@@ -55,7 +56,7 @@ public class LibraryNotificationService {
     @Transactional(readOnly = true)
     public void checkAndNotifyOverdue() {
         LocalDate today = LocalDate.now();
-        List<BorrowBookRecord> overdueBooks = borrowRepository.findByDueDateAfter(today.atStartOfDay());
+        List<BorrowBookRecord> overdueBooks = borrowRepository.findByDueDateBefore(today.atStartOfDay());
 
         for (BorrowBookRecord record : overdueBooks) {
             emailService.sendOverdueNotification(

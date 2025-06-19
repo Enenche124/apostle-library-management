@@ -23,7 +23,7 @@ public class Fine {
     private double fineAmount;
     private FineStatus status;
 
-    private String borrowId; // Reference to the borrow record
+    private String borrowId;
     private LocalDateTime createdDate;
     private LocalDateTime lastUpdatedDate;
     private List<Payment> payments; // Track payment history

@@ -10,7 +10,10 @@ public enum NotificationType {
     PAYMENT_CONFIRMED("Payment Confirmed"),
     FINE_PAID("Fine Fully Paid"),
     BOOK_DUE_SOON("Book Due Soon"),
-    BOOK_OVERDUE("Book Overdue");
+    BOOK_OVERDUE("Book Overdue"),
+    REGISTER("Registered successfully"),
+    BORROW_CONFIRMED("Book borrowed successfully"),
+    RETURN_CONFIRMED("Return book confirmed");
 
     private final String description;
 

@@ -31,16 +31,18 @@ public class AuthenticationServiceImpl implements AuthenticationService{
     private final BCryptPasswordEncoder bCryptPasswordEncoder;
     private final Validator validator;
     private final JwtService jwtService;
+    private final EmailService emailService;
 
     @Autowired
     public AuthenticationServiceImpl(UserRepository userRepository,
                                      AdminRepository adminRepository,
                                      BCryptPasswordEncoder bCryptPasswordEncoder,
-                                     JwtService jwtService) {
+                                     JwtService jwtService, EmailService emailService) {
         this.userRepository = userRepository;
         this.adminRepository = adminRepository;
         this.bCryptPasswordEncoder = bCryptPasswordEncoder;
         this.jwtService = jwtService;
+        this.emailService = emailService;
 
         try(ValidatorFactory factory = Validation.buildDefaultValidatorFactory()) {
             this.validator = factory.getValidator();
@@ -76,11 +78,13 @@ public class AuthenticationServiceImpl implements AuthenticationService{
             return new RegisterResponse(false, "Email already used");
         }
 
+
         switch (role) {
             case USER:
                 User user = mapToUser(registerRequest);
                 user.setPassword(encodedPassword);
                 userRepository.save(user);
+                    emailService.sendRegistrationConfirmation(email, user.getUsername());
                 return mapToRegisterResponse(true, "User registered successfully");
             case ADMIN:
                 Admin admin = mapToAdmin(registerRequest);
@@ -101,14 +105,15 @@ public class AuthenticationServiceImpl implements AuthenticationService{
         Optional<User> foundedUser = userRepository.findUserByEmail(email);
         if (foundedUser.isPresent() && bCryptPasswordEncoder.matches(password, foundedUser.get().getPassword())) {
             String token = jwtService.generateToken(email, Role.USER);
-            System.out.println(token);
-            return mapToLoginResponse(foundedUser.get().getUsername(), true, "USER", token);
+            System.out.println("User token: " + token);
+            return mapToLoginResponse(foundedUser.get().getUsername(), true, "ROLE_USER", token);
         }
 
         Optional<Admin> foundedAdmin = adminRepository.findAdminByEmail(email);
         if (foundedAdmin.isPresent() && bCryptPasswordEncoder.matches(password, foundedAdmin.get().getPassword())) {
             String token = jwtService.generateToken(email, Role.ADMIN);
-            return mapToLoginResponse(foundedAdmin.get().getUsername(), true, "ADMIN", token);
+            System.out.println("Admin token: " + token);
+            return mapToLoginResponse(foundedAdmin.get().getUsername(), true, "ROLE_ADMIN", token);
         }
         return mapToLoginResponse(null, false, null, null);
     }

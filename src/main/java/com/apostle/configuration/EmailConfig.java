@@ -8,9 +8,9 @@ import org.springframework.mail.javamail.JavaMailSenderImpl;
 
 import java.util.Properties;
 
+
 @Configuration
 public class EmailConfig {
-
     @Value("${spring.mail.host}")
     private String mailHost;
 
@@ -22,6 +22,13 @@ public class EmailConfig {
 
     @Value("${spring.mail.password}")
     private String mailPassword;
+
+//    @PostConstruct
+//    public void validateConfiguration() {
+//        if (mailPassword == null || mailPassword.trim().isEmpty()) {
+//            throw new IllegalStateException("Email password/app password is not configured. Please set EMAIL_APP_PASSWORD environment variable.");
+//        }
+//    }
 
     @Bean
     public JavaMailSender getJavaMailSender() {
@@ -36,8 +43,12 @@ public class EmailConfig {
         props.put("mail.transport.protocol", "smtp");
         props.put("mail.smtp.auth", "true");
         props.put("mail.smtp.starttls.enable", "true");
-        props.put("mail.debug", "true"); // Enable for debugging
+        props.put("mail.smtp.starttls.required", "true");
+        props.put("mail.smtp.ssl.trust", "smtp.gmail.com");
+        props.put("mail.smtp.timeout", "5000");
+        props.put("mail.debug", "true");
 
         return mailSender;
     }
+
 }

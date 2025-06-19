@@ -85,7 +85,7 @@ public class GoogleBooksService {
 
 
     private Book mapToBook(String response) {
-        System.out.println("oogle Books API Response: " + response);
+        System.out.println("google Books API Response: " + response);
         try {
             JsonNode root = objectMapper.readTree(response);
             if (root.path("totalItems").asInt() == 0) {

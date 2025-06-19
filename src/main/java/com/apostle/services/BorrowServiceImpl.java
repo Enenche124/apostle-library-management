@@ -8,6 +8,7 @@ import com.apostle.data.repositories.UserRepository;
 import com.apostle.dtos.responses.BorrowResponse;
 import com.apostle.exceptions.LibraryException;
 import com.apostle.utils.Mapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,14 +18,15 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 import static com.apostle.utils.Mapper.mapToBorrowResponse;
-import static com.apostle.utils.Mapper.mapToErrorResponse;
 
+@Slf4j
 @Service
 public class BorrowServiceImpl implements BorrowService {
     private final BorrowBookRecordRepository borrowBookRecordRepository;
     private final BookRepository bookRepository;
     private final UserRepository userRepository;
     private final FineService fineService;
+    private final EmailService emailService;
 
     private static final int LOAN_PERIOD_DAYS = 7;
     private static final double LOAN_FINE_AMOUNT_PER_DAY = 10.0;
@@ -34,11 +36,12 @@ public class BorrowServiceImpl implements BorrowService {
     public BorrowServiceImpl(BorrowBookRecordRepository borrowBookRecordRepository,
                              BookRepository bookRepository,
                              UserRepository userRepository,
-                             FineService fineService) {
+                             FineService fineService, EmailService emailService) {
         this.borrowBookRecordRepository = borrowBookRecordRepository;
         this.bookRepository = bookRepository;
         this.userRepository = userRepository;
         this.fineService = fineService;
+        this.emailService = emailService;
     }
 
     private double getUserUnpaidFines(String userEmail) {
@@ -47,6 +50,16 @@ public class BorrowServiceImpl implements BorrowService {
                 .mapToDouble(BorrowBookRecord::getFineAmount)
                 .sum();
     }
+
+    private void logBookOperationError(String bookIsbn, String userEmail, Exception e) {
+        log.error("{} operation failed | ISBN: {} | User: {} | Error: {}",
+                "Return",
+                bookIsbn,
+                userEmail,
+                e.getMessage()
+        );
+    }
+
 
     @Override
     @Transactional
@@ -67,10 +80,14 @@ public class BorrowServiceImpl implements BorrowService {
 
             User user = userRepository.findUserByEmail(userEmail)
                     .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            log.info("Borrowing book for user: email={}, id={}", userEmail, user.getId());
 
             BorrowBookRecord borrowBookRecord = createBorrowRecord(isbn, userEmail);
             BorrowBookRecord savedRecord = borrowBookRecordRepository.save(borrowBookRecord);
+            log.info("Saved borrow record: borrower={}, isbn={}", savedRecord.getBorrower(), savedRecord.getBookIsbn());
 
+            emailService.sendBorrowConfirmation(user.getEmail(), book.getTitle(), borrowBookRecord.getDueDate().toLocalDate());
+            log.info("Book borrowed successfully: ISBN={}, user={}", isbn, userEmail);
             return mapToBorrowResponse(savedRecord, "Book borrowed successfully", true);
         } catch (IllegalArgumentException e) {
             return new BorrowResponse(e.getMessage(), false, null, isbn, userEmail, null, null, null, null);
@@ -79,39 +96,59 @@ public class BorrowServiceImpl implements BorrowService {
 
     @Override
     @Transactional
-    public BorrowResponse returnBook(String borrowId) {
+    public BorrowResponse returnBook(String bookIsbn, String userEmail) {
         try {
-            BorrowBookRecord borrowBookRecord = borrowBookRecordRepository.findById(borrowId)
-                    .orElseThrow(() -> new IllegalArgumentException("Borrow record not found"));
-
-            if (borrowBookRecord.getStatus() != BorrowStatus.BORROWED) {
-                throw new IllegalArgumentException("Book has already been returned or is not borrowed");
+            List<BorrowBookRecord> borrowBookRecords =  borrowBookRecordRepository.findByBookIsbnAndStatus(bookIsbn, BorrowStatus.BORROWED);
+            if (borrowBookRecords.isEmpty()) {
+                throw new IllegalArgumentException("Book is not currently borrowed");
             }
+            BorrowBookRecord borrowBookRecord = borrowBookRecords.get(0);
+
+//
+//            if (!borrowBookRecord.getBorrower().equals(userEmail)) {
+//                throw new IllegalArgumentException("Only the borrower can return this book");
+//            }
 
             if (LocalDateTime.now().isAfter(borrowBookRecord.getDueDate())) {
-                double finalFine = calculateFine(borrowId);
+                double finalFine = calculateFine(borrowBookRecord.getId());
                 if (finalFine > 0.0) {
-                    Fine fine = fineService.createFine(borrowId, finalFine);
+                    Fine fine = fineService.createFine(borrowBookRecord.getId(), finalFine);
                     borrowBookRecord.setFineAmount(finalFine);
                     borrowBookRecord.setOverdue(true);
+                    borrowBookRecordRepository.save(borrowBookRecord);
                     throw new LibraryException("Please pay the overdue fine before returning the book",
-                            borrowId, borrowBookRecord.getBookIsbn(), borrowBookRecord.getBorrower(), finalFine);
+                            borrowBookRecord.getId(), bookIsbn, userEmail, finalFine);
                 }
             }
+            Book book = bookRepository.findByIsbn(bookIsbn)
+                    .orElseThrow(() -> new IllegalArgumentException("Book not found"));
+
+
 
             borrowBookRecord.setStatus(BorrowStatus.RETURNED);
             borrowBookRecord.setReturnDate(LocalDateTime.now());
             BorrowBookRecord savedRecord = borrowBookRecordRepository.save(borrowBookRecord);
 
+            emailService.sendReturnConfirmation(userEmail, book.getTitle());
+            log.info("Book returned successfully: ISBN={}, user={}", bookIsbn, userEmail);
+
             return mapToBorrowResponse(savedRecord, "Book returned successfully", true);
+        } catch (IllegalArgumentException e) {
+//            log.error("Failed to return book: ISBN={}, user={}, error={}", bookIsbn, userEmail, e.getMessage());
+            logBookOperationError(bookIsbn, userEmail, e);
+            return new BorrowResponse(e.getMessage(), false, null, bookIsbn, userEmail, null, null, null, null);
         } catch (LibraryException e) {
-            return mapToErrorResponse(e.getMessage());
+//            log.error("Failed to return book: ISBN={}, user={}, error={}", bookIsbn, userEmail, e.getMessage());
+            logBookOperationError(bookIsbn, userEmail, e);
+            return new BorrowResponse(e.getMessage(), false, null, bookIsbn, userEmail, null, null, null, e.getFineAmount());
         }
     }
-
     @Override
-    public List<BorrowBookRecord> getCurrentBorrowings(String userId) {
-        return borrowBookRecordRepository.findByBorrowerAndStatus(userId, BorrowStatus.BORROWED);
+    public List<BorrowBookRecord> getCurrentBorrowings(String userEmail) {
+        log.info("Fetching borrowings for userEmail: {}", userEmail);
+        List<BorrowBookRecord> records = borrowBookRecordRepository.findByBorrowerAndStatus(userEmail, BorrowStatus.BORROWED);
+        log.info("Found borrowings: {}", records);
+        return records;
     }
 
     @Override
@@ -121,6 +158,10 @@ public class BorrowServiceImpl implements BorrowService {
 
     @Override
     public boolean isBookAvailable(String isbn) {
+        if (bookRepository.findByIsbn(isbn).isEmpty()) {
+            throw new IllegalArgumentException("Book with ISBN " + isbn + " not found");
+        }
+
         return borrowBookRecordRepository.findByBookIsbnAndStatus(isbn, BorrowStatus.BORROWED).isEmpty();
     }
 

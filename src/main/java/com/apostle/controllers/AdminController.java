@@ -5,13 +5,13 @@ import com.apostle.services.AdminService;
 import com.apostle.services.GoogleBooksService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import java.util.Map;
 
+@CrossOrigin(origins = "http://127.0.0.1:5500", allowedHeaders = "*", methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE, RequestMethod.OPTIONS})
 @RestController
 @RequestMapping("/api/v1/admin")
 @PreAuthorize("hasRole('ADMIN')")
@@ -26,7 +26,7 @@ public class AdminController {
         this.googleBooksService = googleBooksService;
     }
 
-    @PostMapping("/add-book")
+    @PostMapping("/books")
     public ResponseEntity<?> addBook(@Valid @RequestBody Book book) {
         try {
             boolean hasValidFields = book.getTitle() != null && !book.getTitle().isBlank() &&
@@ -36,78 +36,78 @@ public class AdminController {
             if (!hasValidFields && book.getIsbn() != null) {
                 Book googleBook = googleBooksService.fetchBookByIsbn(book.getIsbn()).block();
                 if (googleBook != null) {
-                    book.setTitle(googleBook.getTitle() != null && !googleBook.getTitle().isBlank() ? googleBook.getTitle() : book.getTitle());
-                    book.setAuthor(googleBook.getAuthor() != null && !googleBook.getAuthor().isBlank() ? googleBook.getAuthor() : book.getAuthor());
-                    book.setPublisher(googleBook.getPublisher() != null && !googleBook.getPublisher().isBlank() ? googleBook.getPublisher() : book.getPublisher());
+                    book.setTitle(googleBook.getTitle() != null ? googleBook.getTitle() : book.getTitle());
+                    book.setAuthor(googleBook.getAuthor() != null ? googleBook.getAuthor() : book.getAuthor());
+                    book.setPublisher(googleBook.getPublisher() != null ? googleBook.getPublisher() : book.getPublisher());
                     book.setYearPublished(googleBook.getYearPublished() != 0 ? googleBook.getYearPublished() : book.getYearPublished());
                     book.setCategory(googleBook.getCategory() != null ? googleBook.getCategory() : book.getCategory());
                     book.setTags(googleBook.getTags() != null ? googleBook.getTags() : book.getTags());
                     book.setImageUrl(googleBook.getImageUrl() != null ? googleBook.getImageUrl() : book.getImageUrl());
                 }
             }
-            if (book.getTitle() == null || book.getTitle().isBlank() ||
-                    book.getAuthor() == null || book.getAuthor().isBlank() ||
-                    book.getPublisher() == null || book.getPublisher().isBlank() ||
-                    book.getYearPublished() == 0) {
-                throw new IllegalArgumentException("Title, author, publisher, and year published are required");
-            }
             Book addedBook = adminService.addBook(book);
-            return ResponseEntity.status(HttpStatus.CREATED).body(addedBook);
+            return ResponseEntity.status(201).body(addedBook);
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
-    @DeleteMapping("/delete-book/{isbn}")
+
+    @DeleteMapping("/books/{isbn}")
     public ResponseEntity<?> deleteBook(@PathVariable String isbn) {
         try {
             if (isbn == null || isbn.trim().isEmpty()) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("ISBN cannot be null or empty");
+                return ResponseEntity.badRequest().body(Map.of("error", "ISBN cannot be null or empty"));
             }
             adminService.deleteBook(isbn);
-            return ResponseEntity.ok("Book with ISBN " + isbn + " deleted successfully");
+            return ResponseEntity.ok(Map.of("message", "Book with ISBN " + isbn + " deleted successfully"));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
-    @GetMapping("/view-books")
-    public ResponseEntity<List<Book>> viewAllBooks() {
-        return ResponseEntity.ok(adminService.viewAllBooks());
+    @GetMapping("/books")
+    public ResponseEntity<?> viewAllBooks() {
+        try {
+            return ResponseEntity.ok(Map.of("books", adminService.viewAllBooks()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 
-    @PutMapping("/update-book/{isbn}")
+    @PutMapping("/books/{isbn}")
     public ResponseEntity<?> updateBook(@PathVariable String isbn, @Valid @RequestBody Book book) {
         try {
             if (isbn == null || isbn.trim().isEmpty()) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("ISBN cannot be null or empty");
+                return ResponseEntity.badRequest().body(Map.of("error", "ISBN cannot be null or empty"));
             }
-            return ResponseEntity.ok(adminService.updateBook(isbn, book));
+            Book updatedBook = adminService.updateBook(isbn, book);
+            return ResponseEntity.ok(updatedBook);
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
-    @GetMapping("/search-books")
+    @GetMapping("/books/search")
     public ResponseEntity<?> searchBooks(@RequestParam String query) {
         try {
             if (query == null || query.trim().isEmpty()) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Search query cannot be null or empty");
+                return ResponseEntity.badRequest().body(Map.of("error", "Search query cannot be null or empty"));
             }
-            return ResponseEntity.ok(adminService.searchBooks(query));
+            return ResponseEntity.ok(Map.of("books", adminService.searchBooks(query)));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
-    @GetMapping("/find-book/{isbn}")
+    @GetMapping("/books/{isbn}")
     public ResponseEntity<?> findBookByIsbn(@PathVariable String isbn) {
         try {
             if (isbn == null || isbn.trim().isEmpty()) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("ISBN cannot be null or empty");
+                return ResponseEntity.badRequest().body(Map.of("error", "ISBN cannot be null or empty"));
             }
             return ResponseEntity.ok(adminService.findBookByIsbn(isbn));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 }
